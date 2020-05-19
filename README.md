@@ -9,7 +9,7 @@ By Kendra Oudyk
 ## Rough project ideas
 
 ### What general topic do you want to work on?
-- Using text mining on journal articles to make a method for reliably extracting keywords meta-analyses.
+- Using text mining on journal articles to make a method for reliably extracting keywords for later meta-analyses.
 
 ### What skills do you want to learn, working on this project?
 - text mining
