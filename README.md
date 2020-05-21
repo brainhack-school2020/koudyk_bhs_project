@@ -30,7 +30,11 @@ Researchers are becoming more aware of reproduciblity issues in neuroimaging. Ma
 
 One way to make analyses more reproducible is to automate them using code, and to share the code openly. However, to do this, many researchers would have to commit to learning community-driven tools and programming languages. In order to convince researchers to undertake this challenge, it would be helpful to demonstrate that open tools are being adopted by other researchers, and that it wasn't detrimental to their careers to do so.
 
+### Purpose
+
 The purpose of this project is to look at trends in the use of open versus proprietary programming languages. Specifically, the goal is to make a simple Python package comparing the use of Python versus Matlab over time in neuroimaging papers, and the citation counts for those papers.
+
+### Rough methods
 
 Here's a rough outline of what the package would do
 - Search for open-access articles using PubMed E-utilities, using user input (e.g., "language AND fMRI")
@@ -40,6 +44,10 @@ Here's a rough outline of what the package would do
 - Visualize
   - The use of Python versus Matlab over time
   - The citation counts of papers using Python versus Matlab over time
+
+![](images/python_vs_matlab.png)
+
+Image from [https://realpython.com/matlab-vs-python/](https://realpython.com/matlab-vs-python/)
 
 ### Skills
 - API interaction
