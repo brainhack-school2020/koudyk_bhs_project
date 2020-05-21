@@ -58,7 +58,7 @@ Here's a rough outline of what the package would do
 - [PubMed Open Access Subset](https://www.ncbi.nlm.nih.gov/pmc/tools/openftlist/)
 - [NeuroQuery data](https://github.com/neuroquery/neuroquery_data)
 
-### Delivarables
+### Deliverables
 - A Python package comparing the use of Python versus Matlab over time in academic papers, and how well those papers were cited.
 - A notebook demonstrating how to use the package, focusing on the subfields of neuroimaging.
 
