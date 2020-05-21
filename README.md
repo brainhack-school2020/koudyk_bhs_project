@@ -34,10 +34,6 @@ One way to make analyses more reproducible is to automate them using code, and t
 
 The purpose of this project is to look at trends in the use of open versus proprietary programming languages. Specifically, the goal is to make a simple Python package comparing the use of Python versus Matlab over time in neuroimaging papers, and the citation counts for those papers.
 
-![](images/python_vs_matlab.png)
-
-Image from [https://realpython.com/matlab-vs-python/](https://realpython.com/matlab-vs-python/)
-
 ### Rough methods
 
 Here's a rough outline of what the package would do
