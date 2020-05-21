@@ -6,7 +6,7 @@ By Kendra Oudyk (she/her)
 
 ## Introduction to me
 - I'm a PhD student in neuroscience at McGill, and I'm in the lab of JB Poline. Last year I was a rotation student, so this is my first year in my lab.
-- I have BMus in Music Cognition and a Performance Diploma (piano) from McMaster University, and a Masters of Music, Mind, and Technology from the University of Jyv&auml;skyl&auml; in Finland. Yes, [Finland does exist](https://theculturetrip.com/europe/finland/articles/does-finland-exist-many-dont-think-so/).
+- I have BMus (Music Cognition) and a Performance Diploma (piano) from McMaster University, and a MA (Music, Mind, and Technology) from the University of Jyv&auml;skyl&auml; in Finland. Yes, [Finland does exist](https://theculturetrip.com/europe/finland/articles/does-finland-exist-many-dont-think-so/).
 - I became interested in open science during my masters. I was analyzing some fMRI data when I made a freaky/fascinating discovery: when I tried different methods, I got different results. This began my interest in methods and reproducibility in fMRI.
 - My PhD project is looking at the biases introduced by methodological trends in neuroimaging. This project will involve some text mining, and I'd like to use the BrainHack School project as an opportunity to practice some skills I'll need.
 - I'm Canadian with Dutch roots. I'm a trail runner, pianist, mediocre swing dancer, and (secretly) aspiring astronaut.
