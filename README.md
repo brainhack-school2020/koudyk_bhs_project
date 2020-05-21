@@ -11,6 +11,17 @@ By Kendra Oudyk (she/her)
 - My PhD project is looking at the biases introduced by methodological trends in neuroimaging. This project will involve some text mining, and I'd like to use the BrainHack School project as an opportunity to practice some skills I'll need.
 - I'm Canadian with Dutch roots. I'm a trail runner, pianist, mediocre swing dancer, and (secretly) aspiring astronaut.
 
+### Technical experience
+- I audited the NDS course last year. I'm familiar with (but DEFINITELY not an expert in)
+  - Python
+  - Docker, virtual environments
+  - Bash
+  - Git/Github
+- I want to learn
+  - Software testing
+  - Packaging
+  - XML
+
 ## Project definition
 
 ### Background
