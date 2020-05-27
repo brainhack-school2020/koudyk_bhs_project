@@ -23,6 +23,7 @@ By Kendra Oudyk (she/her)
   - XML
 
 ## Project definition
+[Needs to be updated! This description isn't up-to-date with our current ideas]
 
 ### Background
 
