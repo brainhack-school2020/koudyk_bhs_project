@@ -1,36 +1,32 @@
 #! /usr/bin/env python3
 
-# the goal for this script is to access the pubmed ids
-import pathlib
-import requests
-import numpy as np
 import pprint
-import IPython
-import xml.etree.ElementTree as ET
+import requests
+from lxml import etree
 
-OUTPUT_DIR = pathlib.Path('results_pubmed')
+# user input
+field_query = 'fmri AND language'
+methods_queries = ['spm', 'afni', 'nilearn'] # THIS WORKS
+#methods_queries = ['spm', 'afni', 'nilearn', 'fsl'] # THIS DOESN'T WORK
 
-# esearch url, to be formatted with search terms, etc.
-url_base = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
-url_unformatted = url_base + 'esearch.fcgi?db={db}&term={query}&usehistory=y'
-db = 'pubmed'
+# make dictionaries to store results
+ids = {key: [] for key in methods_queries}
+urls = {key: [] for key in methods_queries}
 
-# define keywords to search for
-ids = {'python': [],
-       'matlab': []
-}
-for keyword in ids.keys():
-    # assemble the esearch url for given keyword
-    query_unformatted = 'functional+neuroimaging[mesh]+AND+{keyword}+AND+2016[pdat]' \
-        + '+AND+pubmed+pmc+open+access[filter]' # for pubmed
-        # + '+AND+open+access[filter]' # for pmc
-    query = query_unformatted.format(keyword=keyword)
-    esr_url = url_unformatted.format(db=db, query=query)
-    print(esr_url, '\n')
+# prepare url
+BASE_URL = ('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed')
+field_query = field_query.replace(' ', '+')
+for methods_query in methods_queries:
+    url = (f'{BASE_URL}&term={field_query}+AND+{methods_query}&usehistory=y')
+    urls[methods_query] = url
 
-    # get ids of papers that include the given keyword
-    esr_response = requests.get(esr_url)
-    esr_root = ET.fromstring(esr_response.text)
-    idlist_parent = esr_root.find('IdList')
-    for child in idlist_parent:
-        ids[keyword].append(int(child.text))
+    # get ids of papers that include the given methods-related keyword
+    response = requests.get(url)
+    xml = response.content
+    tree = etree.XML(xml)
+    if int(tree.find('Count').text) > 0: # if there are any results
+        for id_element in tree.iter('Id'):
+            ids[methods_query].append(int(id_element.text))
+
+pprint.pprint(urls)
+pprint.pprint(ids)
