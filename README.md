@@ -70,3 +70,6 @@ Here's a rough outline of what the package would do
 ### Other possibilities to explore
 - word2vec, word clouds
 - methodological features other than programming language (e.g., analysis software, whether data was shared, etc.)
+
+### NCBI's Disclaimer and Copyright notice
+The National Center for Biotechnology Information (NCBI), who own the PubMed data and E-utilities that we will be using, requests that we make this [Disclaimer and Copyright notice](https://www.ncbi.nlm.nih.gov/home/about/policies/) evident to users.
