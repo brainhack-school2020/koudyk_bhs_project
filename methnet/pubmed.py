@@ -31,20 +31,19 @@ try:
                f'&usehistory=y&email={email}&tool={TOOL}')
         url = url.replace('"', '%22')
         url = url.replace(' ', '+')
+        data[methods_query]['url'] = url
 
         # get data returned from the search, and the query key and web env
         # needed to re-use the search results from history
         response = requests.get(url)
+        data[methods_query]['response'] = response.text
         xml = response.content
         tree = etree.XML(xml)
         query_key = tree.find('QueryKey').text
-        web_env = tree.find('WebEnv').text
-
-        # populate data
-        data[methods_query]['url'] = url
-        data[methods_query]['response'] = response.text
-        data[methods_query]['web_env'] = web_env
         data[methods_query]['query_key'] = query_key
+        web_env = tree.find('WebEnv').text
+        data[methods_query]['web_env'] = web_env
+
 
         # get ids of papers that include the given methods-related keyword
         if int(tree.find('Count').text) > 0: # if there are any results
