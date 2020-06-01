@@ -4,16 +4,15 @@ import time
 import requests
 from lxml import etree
 import json
-import copy
 import traceback
 import pandas as pd
-import IPython
 
 # user input
 FIELD_QUERY = 'fmri AND language'
 METHODS_QUERIES = ['spm', 'afni', 'nilearn', 'fsl']
 EMAIL = 'kendra.oudyk@mail.mcgill.ca'
 API_KEY_FILE = 'pubmed_api_key.txt'
+YEARS = range(2016, 2019)
 
 # more constants for URL
 BASE_URL = ('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/')
@@ -22,22 +21,24 @@ DATABASE = 'pubmed'
 # ELINK_LINKNAME = 'pmc_pmc_cites' # give PMCID
 # ELINK_LINKNAME = 'pmc_refs_pubmed' # give PMCID
 ELINK_LINKNAME = 'pubmed_pubmed_refs'  # give PMID
-
 MAX_N_RESULTS = 100000
 try:
     # if there's an API key provided, we can make 10 requests/sec, if not, 3
     API_KEY = open(API_KEY_FILE, 'r').read().strip()
-    MAX_REQUESTS_PER_SEC = 10
+    MAX_REQUESTS_PER_SEC = 11
 except Exception:
     API_KEY = ['']  # this will go into the URL but will be ignored by the API
     MAX_REQUESTS_PER_SEC = 3
 
+month_strs = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
+              'Oct', 'Nov', 'Dec']
+
 # make pandas dataframe to store results
 columns = (['pmid', 'date'] + METHODS_QUERIES + ['refs',
-        'esearch_url', 'ehistory_url', 'elink_url'])
+           'esearch_url', 'ehistory_url', 'elink_url'])
 data = pd.DataFrame(columns=columns)
 data = data.set_index('pmid', drop=True)
-IPython.embed()
+
 
 def build_esearch_url(methods_query):
     '''
@@ -45,7 +46,7 @@ def build_esearch_url(methods_query):
     '''
     url = (f'{BASE_URL}esearch.fcgi?&db={DATABASE}&retmax={MAX_N_RESULTS}'
            f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
-           f'&term={FIELD_QUERY}+AND+{methods_query}')  # '&usehistory=y')
+           f'&term={FIELD_QUERY}+AND+{methods_query}&usehistory=y')
     url = url.replace('"', '%22').replace(' ', '+')
     return(url)
 
@@ -57,6 +58,19 @@ def build_elink_url(id):
     url = (f'{BASE_URL}elink.fcgi?&dbfrom={DATABASE}'
            f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
            f'&linkname={ELINK_LINKNAME}&id={id}')
+    return url
+
+
+def build_esummary_url_from_history(tree):
+    '''
+    This function builds a history url from the search results of a previous
+    search.
+    '''
+    query_key = tree.find('QueryKey').text
+    web_env = tree.find('WebEnv').text
+    url = (f'{BASE_URL}esummary.fcgi?&db=pubmed&retmax={MAX_N_RESULTS}'
+           f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
+           f'&WebEnv={web_env}&query_key={query_key}')
     return url
 
 
@@ -79,6 +93,18 @@ def space_searches(n_searches):
         time.sleep(MAX_REQUESTS_PER_SEC/100)
 
 
+def pubmed_date_to_datetime(df_date_column):
+    '''
+    Put the date into datetime format
+    '''
+    temp = (data['date'].str.replace('Summer', 'Jul').
+            replace('Fall', 'Oct').replace('Autumn', 'Oct').
+            replace('Winter', 'Jan').replace('Spring', 'May'))
+    temp = temp.str[0:8]
+    datetime_column = pd.to_datetime(temp, yearfirst=True)
+    return datetime_column
+
+
 try:
     for method in METHODS_QUERIES:
         esearch_url = build_esearch_url(method)
@@ -96,6 +122,11 @@ try:
         else:
             esearch_ids = []
 
+        # get esummary results so we can look for the publication date later
+        esummary_url = build_esummary_url_from_history(tree) + '&retmode=json'
+        response = requests.get(esummary_url)
+        esummary_json = response.json()
+
         # add new row in the data dataframe, one for each ID found
         data_method = pd.DataFrame(columns=columns)
         data_method['pmid'] = esearch_ids
@@ -106,8 +137,11 @@ try:
         space_searches(n_searches=len(METHODS_QUERIES))
 
         for n, esearch_id in enumerate(esearch_ids):
-            print('Methods query: %s, looking for refs for ID %d / %d'
+            print('Methods query: %s, looking for date and refs for ID %d / %d'
                   % (method, n + 1, len(esearch_ids)), end='\r')
+
+            date = esummary_json['result'][str(esearch_id)]['pubdate']
+
             elink_url = build_elink_url(esearch_id)
             response = requests.get(elink_url)
             elink_tree = etree.XML(response.content)
@@ -117,9 +151,11 @@ try:
             data.loc[esearch_id, 'elink_url'] = elink_url
             data.loc[esearch_id, method] = 1
             data.loc[esearch_id, 'refs'] = elink_ids
+            data.loc[esearch_id, 'date'] = date
 
             space_searches(n_searches=len(esearch_ids))
         print('\n')
+    data['datetime'] = pubmed_date_to_datetime(data['date'])
 
 # save the data if there's an error so we can debug
 except Exception as err:
@@ -130,15 +166,3 @@ except Exception as err:
 
 # save the data at the end if there's no error
 data.to_csv('pubmed_data.csv')
-
-# def build_esearch_history_url(tree):
-#     '''
-#     This function builds a history url from the search results of a previous
-#     search.
-#     '''
-#     query_key = tree.find('QueryKey').text
-#     web_env = tree.find('WebEnv').text
-#     url = (f'{BASE_URL}esearch.fcgi?&db=pubmed&retmax={MAX_N_RESULTS}' +\
-#            f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}' +\
-#            f'&WebEnv={web_env}&query_key={query_key}')
-#     return url
