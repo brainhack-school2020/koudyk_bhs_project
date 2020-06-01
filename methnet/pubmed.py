@@ -6,6 +6,8 @@ from lxml import etree
 import json
 import copy
 import traceback
+import pandas as pd
+import IPython
 
 # user input
 FIELD_QUERY = 'fmri AND language'
@@ -30,11 +32,12 @@ except Exception:
     API_KEY = ['']  # this will go into the URL but will be ignored by the API
     MAX_REQUESTS_PER_SEC = 3
 
-# make dictionary to store results
-level_2_data = {key: [] for key in ['elink_url', 'ref_ids']}
-level_1_data = {key: [] for key in ['esearch_url', 'search_ids']}
-data = {key: copy.deepcopy(level_1_data) for key in METHODS_QUERIES}
-
+# make pandas dataframe to store results
+columns = (['pmid', 'date'] + METHODS_QUERIES + ['refs',
+        'esearch_url', 'ehistory_url', 'elink_url'])
+data = pd.DataFrame(columns=columns)
+data = data.set_index('pmid', drop=True)
+IPython.embed()
 
 def build_esearch_url(methods_query):
     '''
@@ -79,7 +82,6 @@ def space_searches(n_searches):
 try:
     for method in METHODS_QUERIES:
         esearch_url = build_esearch_url(method)
-        data[method]['esearch_url'] = esearch_url
 
         # get response from URL in an XML tree format
         response = requests.get(esearch_url)
@@ -94,9 +96,11 @@ try:
         else:
             esearch_ids = []
 
-        # add level to data so we can add reference IDs for each search result
-        data[method]['search_ids'] = \
-            {key: copy.deepcopy(level_2_data) for key in esearch_ids}
+        # add new row in the data dataframe, one for each ID found
+        data_method = pd.DataFrame(columns=columns)
+        data_method['pmid'] = esearch_ids
+        data_method = data_method.set_index('pmid', drop=True)
+        data.append(data_method)
 
         # pause if needed so we don't exceed the max number requests per second
         space_searches(n_searches=len(METHODS_QUERIES))
@@ -105,12 +109,14 @@ try:
             print('Methods query: %s, looking for refs for ID %d / %d'
                   % (method, n + 1, len(esearch_ids)), end='\r')
             elink_url = build_elink_url(esearch_id)
-            data[method]['search_ids'][esearch_id]['elink_url'] = elink_url
             response = requests.get(elink_url)
             elink_tree = etree.XML(response.content)
             elink_ids = get_ids(elink_tree)
 
-            data[method]['search_ids'][esearch_id]['ref_ids'] = elink_ids
+            data.loc[esearch_id, 'esearch_url'] = esearch_url
+            data.loc[esearch_id, 'elink_url'] = elink_url
+            data.loc[esearch_id, method] = 1
+            data.loc[esearch_id, 'refs'] = elink_ids
 
             space_searches(n_searches=len(esearch_ids))
         print('\n')
@@ -119,14 +125,11 @@ try:
 except Exception as err:
     traceback.print_tb(err.__traceback__)
     print(err)
-    with open('error__pubmed_data_dumped_by_error.json', 'w') as json_file:
-        json.dump(data, json_file)
-    with open('error__response_dumped_by_error.json', 'w') as json_file:
+    with open('response_dumped_by_error.json', 'w') as json_file:
         json.dump(response.text, json_file)
 
 # save the data at the end if there's no error
-with open('pubmed_data.json', 'w') as json_file:
-    json.dump(data, json_file)
+data.to_csv('pubmed_data.csv')
 
 # def build_esearch_history_url(tree):
 #     '''
