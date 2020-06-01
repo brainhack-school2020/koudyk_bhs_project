@@ -1,7 +1,10 @@
-# ignore rough notes
+# data
+*.json
+
+# rough notes
 sandbox.md
 
-# ignore my pubmed api key
+# my pubmed api key
 pubmed_api_key.txt
 
 # Byte-compiled / optimized / DLL files
