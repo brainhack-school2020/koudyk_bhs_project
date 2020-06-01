@@ -1,6 +1,5 @@
 # data
 *.json
-methnet/*.json
 
 # rough notes
 sandbox.md
