@@ -35,7 +35,7 @@ month_strs = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
 
 # make pandas dataframe to store results
 columns = (['pmid', 'date'] + METHODS_QUERIES + ['refs',
-           'esearch_url', 'ehistory_url', 'elink_url'])
+           'esearch_url', 'esummary_url', 'elink_url'])
 data = pd.DataFrame(columns=columns)
 data = data.set_index('pmid', drop=True)
 
@@ -133,21 +133,23 @@ try:
         data_method = data_method.set_index('pmid', drop=True)
         data.append(data_method)
 
-        # pause if needed so we don't exceed the max number requests per second
         space_searches(n_searches=len(METHODS_QUERIES))
 
         for n, esearch_id in enumerate(esearch_ids):
             print('Methods query: %s, looking for date and refs for ID %d / %d'
                   % (method, n + 1, len(esearch_ids)), end='\r')
 
+            # get the date for each paper
             date = esummary_json['result'][str(esearch_id)]['pubdate']
 
+            # get the ids of papers cited by each paper
             elink_url = build_elink_url(esearch_id)
             response = requests.get(elink_url)
             elink_tree = etree.XML(response.content)
             elink_ids = get_ids(elink_tree)
 
             data.loc[esearch_id, 'esearch_url'] = esearch_url
+            data.loc[esearch_id, 'esummary_url'] = esummary_url
             data.loc[esearch_id, 'elink_url'] = elink_url
             data.loc[esearch_id, method] = 1
             data.loc[esearch_id, 'refs'] = elink_ids
@@ -155,7 +157,13 @@ try:
 
             space_searches(n_searches=len(esearch_ids))
         print('\n')
-    data['datetime'] = pubmed_date_to_datetime(data['date'])
+
+    # convert the dates given by pubmed to datetime
+    data['date'] = pubmed_date_to_datetime(data['date'])
+
+    # convert the methods columns to boolean
+    data[METHODS_QUERIES] = data[METHODS_QUERIES].fillna(0)
+    data[METHODS_QUERIES] = data[METHODS_QUERIES].astype(bool)
 
 # save the data if there's an error so we can debug
 except Exception as err:
