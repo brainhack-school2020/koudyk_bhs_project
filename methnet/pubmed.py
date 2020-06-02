@@ -6,6 +6,7 @@ from lxml import etree
 import json
 import traceback
 import pandas as pd
+import IPython
 
 # user input
 FIELD_QUERY = 'fmri AND language'
@@ -30,12 +31,9 @@ except Exception:
     API_KEY = ['']  # this will go into the URL but will be ignored by the API
     MAX_REQUESTS_PER_SEC = 3
 
-month_strs = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep',
-              'Oct', 'Nov', 'Dec']
-
 # make pandas dataframe to store results
-columns = (['pmid', 'date'] + METHODS_QUERIES + ['refs',
-           'esearch_url', 'esummary_url', 'elink_url'])
+columns = (['pmid', 'date', 'title', 'journal', 'refs'] + METHODS_QUERIES +
+           ['esearch_url', 'esummary_url', 'elink_url'])
 data = pd.DataFrame(columns=columns)
 data = data.set_index('pmid', drop=True)
 
@@ -135,25 +133,29 @@ try:
 
         space_searches(n_searches=len(METHODS_QUERIES))
 
-        for n, esearch_id in enumerate(esearch_ids):
+        for n, esr_id in enumerate(esearch_ids):
             print('Methods query: %s, looking for date and refs for ID %d / %d'
                   % (method, n + 1, len(esearch_ids)), end='\r')
 
-            # get the date for each paper
-            date = esummary_json['result'][str(esearch_id)]['pubdate']
+            # get the date, title, and journal for each paper
+            date = esummary_json['result'][str(esr_id)]['pubdate']
+            title = esummary_json['result'][str(esr_id)]['title']
+            journal = esummary_json['result'][str(esr_id)]['fulljournalname']
 
             # get the ids of papers cited by each paper
-            elink_url = build_elink_url(esearch_id)
+            elink_url = build_elink_url(esr_id)
             response = requests.get(elink_url)
             elink_tree = etree.XML(response.content)
             elink_ids = get_ids(elink_tree)
 
-            data.loc[esearch_id, 'esearch_url'] = esearch_url
-            data.loc[esearch_id, 'esummary_url'] = esummary_url
-            data.loc[esearch_id, 'elink_url'] = elink_url
-            data.loc[esearch_id, method] = 1
-            data.loc[esearch_id, 'refs'] = elink_ids
-            data.loc[esearch_id, 'date'] = date
+            data.loc[esr_id, 'esearch_url'] = esearch_url
+            data.loc[esr_id, 'esummary_url'] = esummary_url
+            data.loc[esr_id, 'elink_url'] = elink_url
+            data.loc[esr_id, method] = 1
+            data.loc[esr_id, 'refs'] = elink_ids
+            data.loc[esr_id, 'date'] = date
+            data.loc[esr_id, 'title'] = title
+            data.loc[esr_id, 'journal'] = journal
 
             space_searches(n_searches=len(esearch_ids))
         print('\n')
@@ -172,5 +174,26 @@ except Exception as err:
     with open('response_dumped_by_error.json', 'w') as json_file:
         json.dump(response.text, json_file)
 
-# save the data at the end if there's no error
+# save all the data
 data.to_csv('pubmed_data.csv')
+
+# make matrix of references
+print('\nConverting citation data to a matrix. This may take a while')
+# list all pmids
+ids = data.index.to_list()
+for row in data['refs']:
+    ids = ids + row
+
+# make an empty adjacency matrix
+mat = pd.DataFrame(columns=ids, index=[i for i in ids]).fillna(0)
+mat.index = mat.index.rename('pmid')
+
+# set to 1 when a pubmed ID
+for n, pmid in enumerate(data.index):
+    print('ID %d / %d' %(n + 1, len(data)), end='\r')
+    for refid in data.loc[pmid]['refs']:
+        mat.loc[pmid, refid] = 1
+print('\n')
+
+# save the matrix
+mat.to_csv('pubmed_citation_matrix.csv')
