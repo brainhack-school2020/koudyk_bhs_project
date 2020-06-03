@@ -7,6 +7,7 @@ import json
 import traceback
 import pandas as pd
 import IPython
+import numpy as np
 
 # user input
 FIELD_QUERY = 'fmri AND language'
@@ -45,7 +46,8 @@ def build_esearch_url(methods_query):
     url = (f'{BASE_URL}esearch.fcgi?&db={DATABASE}&retmax={MAX_N_RESULTS}'
            f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
            f'&term={FIELD_QUERY}+AND+{methods_query}&usehistory=y')
-    url = url.replace('"', '%22').replace(' ', '+')
+    url = url.replace('"', '%22').replace(' ', '+').replace('()', '').\
+          replace(')', '')
     return(url)
 
 
@@ -179,10 +181,12 @@ data.to_csv('pubmed_data.csv')
 
 # make matrix of references
 print('\nConverting citation data to a matrix. This may take a while')
-# list all pmids
+
+# list all unique pmids
 ids = data.index.to_list()
 for row in data['refs']:
     ids = ids + row
+ids = np.unique(ids)
 
 # make an empty adjacency matrix
 mat = pd.DataFrame(columns=ids, index=[i for i in ids]).fillna(0)
