@@ -10,7 +10,7 @@ import IPython
 import numpy as np
 import re
 
-print_urls = False  # I set this to true when debugging
+print_urls = True  # I set this to true when debugging
 
 # user input
 FIELD_QUERY = '"functional neuroimaging"[mesh] AND music[mesh]'
@@ -22,10 +22,11 @@ YEARS = range(2016, 2019)
 # more constants for URL
 BASE_URL = ('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/')
 TOOL = 'methnet'
-DATABASE = 'pubmed'
-# ELINK_LINKNAME = 'pmc_pmc_cites' # give PMCID
+ESEARCH_DB = 'pubmed'
+ELINK_DB = 'pmc'
+ELINK_LINKNAME = 'pmc_pmc_cites' # give PMCID
 # ELINK_LINKNAME = 'pmc_refs_pubmed' # give PMCID
-ELINK_LINKNAME = 'pubmed_pubmed_refs'  # give PMID
+#ELINK_LINKNAME = 'pubmed_pubmed_refs'  # give PMID
 MAX_N_RESULTS = 100000
 try:
     # if there's an API key provided, we can make 10 requests/sec, if not, 3
@@ -47,7 +48,7 @@ def build_esearch_url():
     '''
     This function builds a esearch URL witht the given methods query.
     '''
-    url = (f'{BASE_URL}esearch.fcgi?&db={DATABASE}&retmax={MAX_N_RESULTS}'
+    url = (f'{BASE_URL}esearch.fcgi?&db={ESEARCH_DB}&retmax={MAX_N_RESULTS}'
            f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}&usehistory=y'
            f'&term={FIELD_QUERY}+AND+pubmed+pmc+open+access[filter]')
            # f'&term={FIELD_QUERY}+AND+{methods_query}&usehistory=y')
@@ -64,31 +65,14 @@ def build_efetch_url_from_history(pmcid, esearch_tree):
                   f'&WebEnv={web_env}&query_key={query_key}')
     return efetch_url
 
-def build_oas_download_url(pmcid): # unused
-    url = (f'https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?'
-           f'api_key={API_KEY}&tool={TOOL}&email={EMAIL}&id=PMC{pmcid}')
-
 
 def build_elink_url(id):
     '''
     Returns an e-link URL for the ID for a paper.
     '''
-    url = (f'{BASE_URL}elink.fcgi?&dbfrom={DATABASE}'
+    url = (f'{BASE_URL}elink.fcgi?&dbfrom={ELINK_DB}'
            f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
            f'&linkname={ELINK_LINKNAME}&id={id}')
-    return url
-
-
-def build_esummary_url_from_history(tree):
-    '''
-    This function builds a history url from the search results of a previous
-    search.
-    '''
-    query_key = tree.find('QueryKey').text
-    web_env = tree.find('WebEnv').text
-    url = (f'{BASE_URL}esummary.fcgi?&db=pubmed&retmax={MAX_N_RESULTS}'
-           f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
-           f'&WebEnv={web_env}&query_key={query_key}')
     return url
 
 
@@ -130,6 +114,7 @@ def divide_list_into_chunks(my_list, chunk_len):
 
 def pmids_to_pmcids(pmid_list):
     pmcids = []
+    urls = []
     before = '" pmcid="PMC'
     after = '" pmid="'
     # break list of ids into chunks of 200, since that is the limit for the api
@@ -137,6 +122,7 @@ def pmids_to_pmcids(pmid_list):
     for chunk in ids_in_chunks:
         cnvrt_url = ('https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?'
                  f'api_key={API_KEY}&tool={TOOL}&email={EMAIL}&ids={chunk}').replace(' ', '').replace('[', '').replace(']', '')
+        urls.append(cnvrt_url)
         if print_urls: print('PMID-PMCID URL: ', cnvrt_url, '\n')
         response = requests.get(cnvrt_url)
         resp_text = response.text
@@ -147,7 +133,7 @@ def pmids_to_pmcids(pmid_list):
             pmcids.append(int(resp_text[start : end]))
 
         space_searches(n_searches=len(ids_in_chunks))
-    return pmcids
+    return pmcids, urls
 
 
 def get_method_data(pmcids, esearch_tree):
@@ -193,7 +179,7 @@ try:
 
     # convert the pubmed ids from the search results to pmc ids, so that we
     # can access the full text with efetch
-    pmcids = pmids_to_pmcids(esearch_ids)
+    pmcids, cnvrt_urls = pmids_to_pmcids(esearch_ids)
     #pmcids = pmcids[:10]  # limit number while figuring out code
 
     # add new row in the data dataframe, one for each ID found
@@ -238,8 +224,9 @@ try:
         data.loc[pmcid, 'title'] = title
         data.loc[pmcid, 'journal'] = journal
         data.loc[pmcid, 'esearch_url'] = esearch_url
-        data.loc[pmcid, 'efetch'] = efetch_url
+        data.loc[pmcid, 'efetch_url'] = efetch_url
         data.loc[pmcid, 'elink_url'] = elink_url
+        data.loc[pmcid, 'pm_pmc_cnvrt_urls'] = cnvrt_urls
 
         space_searches(n_searches=len(pmcids))
 
