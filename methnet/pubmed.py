@@ -10,7 +10,7 @@ import IPython
 import numpy as np
 import re
 
-print_urls = True  # I set this to true when debugging
+print_urls = False  # I set this to true when debugging
 
 # user input
 FIELD_QUERY = '"functional neuroimaging"[mesh] AND music[mesh]'
@@ -113,24 +113,19 @@ def divide_list_into_chunks(my_list, chunk_len):
 
 
 def pmids_to_pmcids(pmid_list):
-    pmcids = []
     urls = []
-    before = '" pmcid="PMC'
-    after = '" pmid="'
     # break list of ids into chunks of 200, since that is the limit for the api
     ids_in_chunks = list(divide_list_into_chunks(esearch_ids, 200))
     for chunk in ids_in_chunks:
         cnvrt_url = ('https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?'
                  f'api_key={API_KEY}&tool={TOOL}&email={EMAIL}&ids={chunk}').replace(' ', '').replace('[', '').replace(']', '')
         urls.append(cnvrt_url)
-        if print_urls: print('PMID-PMCID URL: ', cnvrt_url, '\n')
+        if print_urls:
+            print('PMID-PMCID URL: ', cnvrt_url, '\n')
         response = requests.get(cnvrt_url)
-        resp_text = response.text
-        starts = [m.start() for m in re.finditer(before, resp_text)]
-        starts = [start + len(before) for start in starts]
-        ends = [m.start() for m in re.finditer(after, resp_text)]
-        for start, end in zip(starts, ends):
-            pmcids.append(int(resp_text[start : end]))
+        tree = etree.XML(response.content)
+        full_pmcids = tree.xpath("//record/@pmcid")
+        pmcids = [int(re.match(r"PMC(\d+)", pmcid).group(1)) for pmcid in full_pmcids]
 
         space_searches(n_searches=len(ids_in_chunks))
     return pmcids, urls
@@ -150,6 +145,15 @@ def get_method_data(pmcids, esearch_tree):
         for n_meth, method in enumerate(METHODS_QUERIES):
             method_data[n_id, n_meth] = resp_text.count(method)
     return method_data
+
+def get_pmid_from_efetch_result(response):
+    text = response.text
+    before = '<article-id pub-id-type="pmid">'
+    after = '</article-id>'
+    start = [m.start() for m in re.finditer(before, text)][0] + len(before)
+    end = [m.start() for m in re.finditer(after, text)][0]
+    pmid = int(text[start : end])
+    return pmid
 
 
 def get_first_instance(tree, term):
@@ -200,10 +204,12 @@ try:
         resp_text = response.text.lower()
         eft_tree = etree.XML(response.content)
 
+        # get info from the xml
         title = get_first_instance(eft_tree, 'article-title')
         journal = get_first_instance(eft_tree, 'journal-title')
         month = get_first_instance(eft_tree, 'month')
         year = get_first_instance(eft_tree, 'year')
+        pmid = get_pmid_from_efetch_result(response)
 
         # get the counts of the number of times each method was mentioned
         for n_meth, method in enumerate(METHODS_QUERIES):
@@ -217,7 +223,7 @@ try:
         elink_tree = etree.XML(response.content)
         elink_ids = get_ids(elink_tree)
 
-        data.loc[pmcid, 'pmid'] = esearch_ids[n_id]
+        data.loc[pmcid, 'pmid'] = pmid
         data.loc[pmcid, 'refs'] = elink_ids
         data.loc[pmcid, 'month'] = month
         data.loc[pmcid, 'year'] = year
@@ -236,11 +242,11 @@ try:
 except Exception as err:
     traceback.print_tb(err.__traceback__)
     print(err)
-    with open('response_dumped_by_error.json', 'w') as json_file:
+    with open('../data/response_dumped_by_error.json', 'w') as json_file:
         json.dump(response.text, json_file)
 
 # save all the data
-data.to_csv('pubmed_data.csv')
+data.to_csv('../data/pubmed_data.csv')
 
 # # make matrix of references
 # print('\nConverting citation data to a matrix. This may take a while')
