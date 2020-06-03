@@ -8,9 +8,11 @@ import traceback
 import pandas as pd
 import IPython
 import numpy as np
+import re
 
 # user input
 FIELD_QUERY = 'fmri AND language'
+FIELD_QUERY = '"functional neuroimaging"[mesh] AND language[mesh]'
 METHODS_QUERIES = ['spm', 'afni', 'nilearn', 'fsl']
 EMAIL = 'kendra.oudyk@mail.mcgill.ca'
 API_KEY_FILE = 'pubmed_api_key.txt'
@@ -44,11 +46,23 @@ def build_esearch_url(methods_query):
     This function builds a esearch URL witht the given methods query.
     '''
     url = (f'{BASE_URL}esearch.fcgi?&db={DATABASE}&retmax={MAX_N_RESULTS}'
-           f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
-           f'&term={FIELD_QUERY}+AND+{methods_query}&usehistory=y')
+           f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}&usehistory=y'
+           f'&term={FIELD_QUERY}+AND+pubmed+pmc+open+access[filter]')
+           # f'&term={FIELD_QUERY}+AND+{methods_query}&usehistory=y')
     url = url.replace('"', '%22').replace(' ', '+').replace('()', '').\
-          replace(')', '')
+              replace(')', '')
     return(url)
+
+def convert_pmids_to_pmcids(id_list):
+    d = 1
+    return pmcids
+
+
+
+def build_oas_url(pmid):
+    url = (f'https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id=PM{pmid}')
+    # https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?id=PMC5334499
+    return url
 
 
 def build_elink_url(id):
@@ -104,10 +118,32 @@ def pubmed_date_to_datetime(df_date_column):
     datetime_column = pd.to_datetime(temp, yearfirst=True)
     return datetime_column
 
+def divide_list_into_chunks(my_list, chunk_len):
+    for i in range(0, len(my_list), chunk_len):
+        yield my_list[i:i + chunk_len]
+
+def pmids_to_pmcids(pmid_list):
+    pmcids = []
+    before = '" pmcid="PMC'
+    after = '" pmid="'
+    # break list of ids into chunks of 200, since that is the limit for the api
+    ids_in_chunks = list(divide_list_into_chunks(esearch_ids, 200))
+    for chunk in ids_in_chunks:
+        cnvrt_url = ('https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/'
+                 f'?api_key={API_KEY}&tool={TOOL}&email={EMAIL}&ids={chunk}').replace(' ', '').replace('[', '').replace(']', '')
+        response = requests.get(cnvrt_url)
+        resp_text = response.text
+        starts = [m.start() for m in re.finditer(before, resp_text)]
+        starts = [start + len(before) for start in starts]
+        ends = [m.start() for m in re.finditer(after, resp_text)]
+        for start, end in zip(starts, ends):
+            pmcids.append(int(resp_text[start : end]))
+    return pmcids
 
 try:
     for method in METHODS_QUERIES:
         esearch_url = build_esearch_url(method)
+        print(esearch_url)
 
         # get response from URL in an XML tree format
         response = requests.get(esearch_url)
@@ -121,6 +157,8 @@ try:
             esearch_ids = get_ids(tree)
         else:
             esearch_ids = []
+
+        pmcids = pmids_to_pmcids(esearch_ids)
 
         # get esummary results so we can look for the publication date later
         esummary_url = build_esummary_url_from_history(tree) + '&retmode=json'
@@ -138,6 +176,9 @@ try:
         for n, esr_id in enumerate(esearch_ids):
             print('Methods query: %s, looking for date and refs for ID %d / %d'
                   % (method, n + 1, len(esearch_ids)), end='\r')
+
+            oas_url = build_oas_url(esr_id)
+            IPython.embed()
 
             # get the date, title, and journal for each paper
             date = esummary_json['result'][str(esr_id)]['pubdate']
@@ -194,7 +235,7 @@ mat.index = mat.index.rename('pmid')
 
 # set to 1 when a pubmed ID
 for n, pmid in enumerate(data.index):
-    print('ID %d / %d' %(n + 1, len(data)), end='\r')
+    print('ID %d / %d' % (n + 1, len(data)), end='\r')
     for refid in data.loc[pmid]['refs']:
         mat.loc[pmid, refid] = 1
 print('\n')
