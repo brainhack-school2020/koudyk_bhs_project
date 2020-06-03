@@ -8,9 +8,12 @@ import traceback
 import pandas as pd
 import IPython
 import numpy as np
+import re
+
+print_urls = False  # I set this to true when debugging
 
 # user input
-FIELD_QUERY = 'fmri AND language'
+FIELD_QUERY = '"functional neuroimaging"[mesh] AND music[mesh]'
 METHODS_QUERIES = ['spm', 'afni', 'nilearn', 'fsl']
 EMAIL = 'kendra.oudyk@mail.mcgill.ca'
 API_KEY_FILE = 'pubmed_api_key.txt'
@@ -33,22 +36,37 @@ except Exception:
     MAX_REQUESTS_PER_SEC = 3
 
 # make pandas dataframe to store results
-columns = (['pmid', 'date', 'title', 'journal', 'refs'] + METHODS_QUERIES +
-           ['esearch_url', 'esummary_url', 'elink_url'])
+columns = (['pmcid', 'pmid', 'month', 'year', 'title', 'journal', 'refs'] +
+           METHODS_QUERIES +
+           ['esearch_url', 'efetch_url', 'elink_url'])
 data = pd.DataFrame(columns=columns)
-data = data.set_index('pmid', drop=True)
+data = data.set_index('pmcid', drop=True)
 
 
-def build_esearch_url(methods_query):
+def build_esearch_url():
     '''
     This function builds a esearch URL witht the given methods query.
     '''
     url = (f'{BASE_URL}esearch.fcgi?&db={DATABASE}&retmax={MAX_N_RESULTS}'
-           f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
-           f'&term={FIELD_QUERY}+AND+{methods_query}&usehistory=y')
+           f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}&usehistory=y'
+           f'&term={FIELD_QUERY}+AND+pubmed+pmc+open+access[filter]')
+           # f'&term={FIELD_QUERY}+AND+{methods_query}&usehistory=y')
     url = url.replace('"', '%22').replace(' ', '+').replace('()', '').\
-          replace(')', '')
+              replace(')', '')
     return(url)
+
+def build_efetch_url_from_history(pmcid, esearch_tree):
+    query_key = esearch_tree.find('QueryKey').text
+    web_env = esearch_tree.find('WebEnv').text
+    efetch_url = (f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
+                  f'efetch.fcgi?db=pmc&id={pmcid}'
+                  f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
+                  f'&WebEnv={web_env}&query_key={query_key}')
+    return efetch_url
+
+def build_oas_download_url(pmcid): # unused
+    url = (f'https://www.ncbi.nlm.nih.gov/pmc/utils/oa/oa.fcgi?'
+           f'api_key={API_KEY}&tool={TOOL}&email={EMAIL}&id=PMC{pmcid}')
 
 
 def build_elink_url(id):
@@ -105,69 +123,127 @@ def pubmed_date_to_datetime(df_date_column):
     return datetime_column
 
 
+def divide_list_into_chunks(my_list, chunk_len):
+    for i in range(0, len(my_list), chunk_len):
+        yield my_list[i:i + chunk_len]
+
+
+def pmids_to_pmcids(pmid_list):
+    pmcids = []
+    before = '" pmcid="PMC'
+    after = '" pmid="'
+    # break list of ids into chunks of 200, since that is the limit for the api
+    ids_in_chunks = list(divide_list_into_chunks(esearch_ids, 200))
+    for chunk in ids_in_chunks:
+        cnvrt_url = ('https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?'
+                 f'api_key={API_KEY}&tool={TOOL}&email={EMAIL}&ids={chunk}').replace(' ', '').replace('[', '').replace(']', '')
+        if print_urls: print('PMID-PMCID URL: ', cnvrt_url, '\n')
+        response = requests.get(cnvrt_url)
+        resp_text = response.text
+        starts = [m.start() for m in re.finditer(before, resp_text)]
+        starts = [start + len(before) for start in starts]
+        ends = [m.start() for m in re.finditer(after, resp_text)]
+        for start, end in zip(starts, ends):
+            pmcids.append(int(resp_text[start : end]))
+
+        space_searches(n_searches=len(ids_in_chunks))
+    return pmcids
+
+
+def get_method_data(pmcids, esearch_tree):
+    '''
+    Get the number of times each method is mentioned in each paper.
+    '''
+    method_data = np.zeros((len(pmcids), len(METHODS_QUERIES)))
+    for n_id, pmcid in enumerate(pmcids):
+        print(f'Getting data for ID {n_id} / {len(pmcids)}', end='\r')
+        efetch_url = build_efetch_url_from_history(pmcid, esearch_tree)
+        response = requests.get(efetch_url)
+        resp_text = response.text.lower()
+
+        for n_meth, method in enumerate(METHODS_QUERIES):
+            method_data[n_id, n_meth] = resp_text.count(method)
+    return method_data
+
+
+def get_first_instance(tree, term):
+    items = []
+    for el in eft_tree.iter(term):
+        items.append(el.text)
+    return items[0]
+
 try:
-    for method in METHODS_QUERIES:
-        esearch_url = build_esearch_url(method)
+    # ESEARCH ##############################################################
+    esearch_url = build_esearch_url()
+    if print_urls: print('ESEARCH URL', esearch_url, '\n')
 
-        # get response from URL in an XML tree format
-        response = requests.get(esearch_url)
-        tree = etree.XML(response.content)
+    # get response from URL in an XML tree format
+    response = requests.get(esearch_url)
+    esearch_tree = etree.XML(response.content)
 
-        # get ids of papers that include the given methods-related keyword
-        if int(tree.find('Count').text) > MAX_N_RESULTS:
-            print(f'Warning: More than the max. number of results allowed per'
-                  ' page; only the first {MAX_N_RESULTS} will be considered')
-        if int(tree.find('Count').text) > 0:  # if there are any results
-            esearch_ids = get_ids(tree)
-        else:
-            esearch_ids = []
+    # get ids of papers that include the given methods-related keyword
+    if int(esearch_tree.find('Count').text) > MAX_N_RESULTS:
+        print(f'Warning: More than the max. number of results allowed per'
+              ' page; only the first {MAX_N_RESULTS} will be considered')
+    if int(esearch_tree.find('Count').text) > 0:  # if there are any results
+        esearch_ids = get_ids(esearch_tree)
+    else:
+        esearch_ids = []
+        print('No search results :\'(' )
 
-        # get esummary results so we can look for the publication date later
-        esummary_url = build_esummary_url_from_history(tree) + '&retmode=json'
-        response = requests.get(esummary_url)
-        esummary_json = response.json()
+    # convert the pubmed ids from the search results to pmc ids, so that we
+    # can access the full text with efetch
+    pmcids = pmids_to_pmcids(esearch_ids)
+    #pmcids = pmcids[:10]  # limit number while figuring out code
 
-        # add new row in the data dataframe, one for each ID found
-        data_method = pd.DataFrame(columns=columns)
-        data_method['pmid'] = esearch_ids
-        data_method = data_method.set_index('pmid', drop=True)
-        data.append(data_method)
+    # add new row in the data dataframe, one for each ID found
+    data_method = pd.DataFrame(columns=columns)
+    data_method['pmcid'] = pmcids
+    data_method = data_method.set_index('pmcid', drop=True)
+    data.append(data_method)
 
-        space_searches(n_searches=len(METHODS_QUERIES))
+    # get data for each paper
+    for n_id, pmcid in enumerate(pmcids):
+        print(f'Getting data for ID {n_id} / {len(pmcids)}', end='\r')
 
-        for n, esr_id in enumerate(esearch_ids):
-            print('Methods query: %s, looking for date and refs for ID %d / %d'
-                  % (method, n + 1, len(esearch_ids)), end='\r')
+        # EFETCH ##############################################################
+        # use efetch to get the full text
+        efetch_url = build_efetch_url_from_history(pmcid, esearch_tree)
+        if print_urls: print('EFETCH URL', efetch_url, '\n')
+        response = requests.get(efetch_url)
+        resp_text = response.text.lower()
+        eft_tree = etree.XML(response.content)
 
-            # get the date, title, and journal for each paper
-            date = esummary_json['result'][str(esr_id)]['pubdate']
-            title = esummary_json['result'][str(esr_id)]['title']
-            journal = esummary_json['result'][str(esr_id)]['fulljournalname']
+        title = get_first_instance(eft_tree, 'article-title')
+        journal = get_first_instance(eft_tree, 'journal-title')
+        month = get_first_instance(eft_tree, 'month')
+        year = get_first_instance(eft_tree, 'year')
 
-            # get the ids of papers cited by each paper
-            elink_url = build_elink_url(esr_id)
-            response = requests.get(elink_url)
-            elink_tree = etree.XML(response.content)
-            elink_ids = get_ids(elink_tree)
+        # get the counts of the number of times each method was mentioned
+        for n_meth, method in enumerate(METHODS_QUERIES):
+            data.loc[pmcid, method] = resp_text.count(method)
 
-            data.loc[esr_id, 'esearch_url'] = esearch_url
-            data.loc[esr_id, 'esummary_url'] = esummary_url
-            data.loc[esr_id, 'elink_url'] = elink_url
-            data.loc[esr_id, method] = 1
-            data.loc[esr_id, 'refs'] = elink_ids
-            data.loc[esr_id, 'date'] = date
-            data.loc[esr_id, 'title'] = title
-            data.loc[esr_id, 'journal'] = journal
+        # ELINK ##############################################################
+        # get the ids of papers cited by each paper
+        elink_url = build_elink_url(pmcid)
+        if print_urls: print('ELINK URL', elink_url, '\n')
+        response = requests.get(elink_url)
+        elink_tree = etree.XML(response.content)
+        elink_ids = get_ids(elink_tree)
 
-            space_searches(n_searches=len(esearch_ids))
-        print('\n')
+        data.loc[pmcid, 'pmid'] = esearch_ids[n_id]
+        data.loc[pmcid, 'refs'] = elink_ids
+        data.loc[pmcid, 'month'] = month
+        data.loc[pmcid, 'year'] = year
+        data.loc[pmcid, 'title'] = title
+        data.loc[pmcid, 'journal'] = journal
+        data.loc[pmcid, 'esearch_url'] = esearch_url
+        data.loc[pmcid, 'efetch'] = efetch_url
+        data.loc[pmcid, 'elink_url'] = elink_url
 
-    # convert the dates given by pubmed to datetime
-    data['date'] = pubmed_date_to_datetime(data['date'])
+        space_searches(n_searches=len(pmcids))
 
-    # convert the methods columns to boolean
-    data[METHODS_QUERIES] = data[METHODS_QUERIES].fillna(0)
-    data[METHODS_QUERIES] = data[METHODS_QUERIES].astype(bool)
+    print('\n')
 
 # save the data if there's an error so we can debug
 except Exception as err:
@@ -179,25 +255,25 @@ except Exception as err:
 # save all the data
 data.to_csv('pubmed_data.csv')
 
-# make matrix of references
-print('\nConverting citation data to a matrix. This may take a while')
-
-# list all unique pmids
-ids = data.index.to_list()
-for row in data['refs']:
-    ids = ids + row
-ids = np.unique(ids)
-
-# make an empty adjacency matrix
-mat = pd.DataFrame(columns=ids, index=[i for i in ids]).fillna(0)
-mat.index = mat.index.rename('pmid')
-
-# set to 1 when a pubmed ID
-for n, pmid in enumerate(data.index):
-    print('ID %d / %d' %(n + 1, len(data)), end='\r')
-    for refid in data.loc[pmid]['refs']:
-        mat.loc[pmid, refid] = 1
-print('\n')
-
-# save the matrix
-mat.to_csv('pubmed_citation_matrix.csv')
+# # make matrix of references
+# print('\nConverting citation data to a matrix. This may take a while')
+#
+# # list all unique pmids
+# ids = data.index.to_list()
+# for row in data['refs']:
+#     ids = ids + row
+# ids = np.unique(ids)
+#
+# # make an empty adjacency matrix
+# mat = pd.DataFrame(columns=ids, index=[i for i in ids]).fillna(0)
+# mat.index = mat.index.rename('pmid')
+#
+# # set to 1 when a pubmed ID
+# for n, pmid in enumerate(data.index):
+#     print('ID %d / %d' % (n + 1, len(data)), end='\r')
+#     for refid in data.loc[pmid]['refs']:
+#         mat.loc[pmid, refid] = 1
+# print('\n')
+#
+# # save the matrix
+# mat.to_csv('pubmed_citation_matrix.csv')
