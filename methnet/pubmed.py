@@ -6,7 +6,6 @@ from lxml import etree
 import json
 import traceback
 import pandas as pd
-import IPython
 import numpy as np
 import re
 
@@ -26,7 +25,7 @@ ESEARCH_DB = 'pubmed'
 ELINK_DB = 'pmc'
 ELINK_LINKNAME = 'pmc_pmc_cites' # give PMCID
 # ELINK_LINKNAME = 'pmc_refs_pubmed' # give PMCID
-#ELINK_LINKNAME = 'pubmed_pubmed_refs'  # give PMID
+# ELINK_LINKNAME = 'pubmed_pubmed_refs'  # give PMID
 MAX_N_RESULTS = 100000
 try:
     # if there's an API key provided, we can make 10 requests/sec, if not, 3
@@ -51,10 +50,12 @@ def build_esearch_url():
     url = (f'{BASE_URL}esearch.fcgi?&db={ESEARCH_DB}&retmax={MAX_N_RESULTS}'
            f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}&usehistory=y'
            f'&term={FIELD_QUERY}+AND+pubmed+pmc+open+access[filter]')
-           # f'&term={FIELD_QUERY}+AND+{methods_query}&usehistory=y')
-    url = url.replace('"', '%22').replace(' ', '+').replace('()', '').\
-              replace(')', '')
+    url = (url.replace('"', '%22').replace(' ', '+').replace('()', '').
+           replace(')', ''))
+    if print_urls:
+        print('ESEARCH URL', esearch_url, '\n')
     return(url)
+
 
 def build_efetch_url_from_history(pmcid, esearch_tree):
     query_key = esearch_tree.find('QueryKey').text
@@ -63,6 +64,8 @@ def build_efetch_url_from_history(pmcid, esearch_tree):
                   f'efetch.fcgi?db=pmc&id={pmcid}'
                   f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
                   f'&WebEnv={web_env}&query_key={query_key}')
+    if print_urls:
+        print('EFETCH URL', efetch_url, '\n')
     return efetch_url
 
 
@@ -73,6 +76,8 @@ def build_elink_url(id):
     url = (f'{BASE_URL}elink.fcgi?&dbfrom={ELINK_DB}'
            f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
            f'&linkname={ELINK_LINKNAME}&id={id}')
+    if print_urls:
+        print('ELINK URL', elink_url, '\n')
     return url
 
 
@@ -117,12 +122,13 @@ def pmids_to_pmcids(pmid_list):
     # break list of ids into chunks of 200, since that is the limit for the api
     ids_in_chunks = list(divide_list_into_chunks(esearch_ids, 200))
     for chunk in ids_in_chunks:
-        cnvrt_url = ('https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?'
-                 f'api_key={API_KEY}&tool={TOOL}&email={EMAIL}&ids={chunk}').replace(' ', '').replace('[', '').replace(']', '')
-        urls.append(cnvrt_url)
+        url = ('https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/?'
+               f'api_key={API_KEY}&tool={TOOL}&email={EMAIL}&ids={chunk}')\
+                .replace(' ', '').replace('[', '').replace(']', '')
+        urls.append(url)
         if print_urls:
-            print('PMID-PMCID URL: ', cnvrt_url, '\n')
-        response = requests.get(cnvrt_url)
+            print('PMID-PMCID URL: ', url, '\n')
+        response = requests.get(url)
         tree = etree.XML(response.content)
         full_pmcids = tree.xpath("//record/@pmcid")
         pmcids = [int(re.match(r"PMC(\d+)", pmcid).group(1)) for pmcid in full_pmcids]
@@ -146,13 +152,14 @@ def get_method_data(pmcids, esearch_tree):
             method_data[n_id, n_meth] = resp_text.count(method)
     return method_data
 
+
 def get_pmid_from_efetch_result(response):
     text = response.text
     before = '<article-id pub-id-type="pmid">'
     after = '</article-id>'
     start = [m.start() for m in re.finditer(before, text)][0] + len(before)
     end = [m.start() for m in re.finditer(after, text)][0]
-    pmid = int(text[start : end])
+    pmid = int(text[start: end])
     return pmid
 
 
@@ -162,10 +169,10 @@ def get_first_instance(tree, term):
         items.append(el.text)
     return items[0]
 
+
 try:
     # ESEARCH ##############################################################
     esearch_url = build_esearch_url()
-    if print_urls: print('ESEARCH URL', esearch_url, '\n')
 
     # get response from URL in an XML tree format
     response = requests.get(esearch_url)
@@ -179,12 +186,11 @@ try:
         esearch_ids = get_ids(esearch_tree)
     else:
         esearch_ids = []
-        print('No search results :\'(' )
+        print('No search results:\'(')
 
     # convert the pubmed ids from the search results to pmc ids, so that we
     # can access the full text with efetch
     pmcids, cnvrt_urls = pmids_to_pmcids(esearch_ids)
-    #pmcids = pmcids[:10]  # limit number while figuring out code
 
     # add new row in the data dataframe, one for each ID found
     data_method = pd.DataFrame(columns=columns)
@@ -199,7 +205,6 @@ try:
         # EFETCH ##############################################################
         # use efetch to get the full text
         efetch_url = build_efetch_url_from_history(pmcid, esearch_tree)
-        if print_urls: print('EFETCH URL', efetch_url, '\n')
         response = requests.get(efetch_url)
         resp_text = response.text.lower()
         eft_tree = etree.XML(response.content)
@@ -218,7 +223,6 @@ try:
         # ELINK ##############################################################
         # get the ids of papers cited by each paper
         elink_url = build_elink_url(pmcid)
-        if print_urls: print('ELINK URL', elink_url, '\n')
         response = requests.get(elink_url)
         elink_tree = etree.XML(response.content)
         elink_ids = get_ids(elink_tree)
