@@ -1,6 +1,9 @@
 # ignore yearly png's used to make gif
 images/images_for_gif/
 
+# error files
+*error*.json
+
 # jupyter notebooks
 *.ipynb
 
