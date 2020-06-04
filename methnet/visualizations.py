@@ -25,12 +25,13 @@ from matplotlib.colors import ListedColormap, LinearSegmentedColormap, BoundaryN
 from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 import math
+import imageio
 
 random_seed = 39838475
 np.random.seed(seed=random_seed)
 
 METHODS_QUERIES = ['spm', 'afni', 'nilearn', 'fsl']
-FIELD_QUERY = 'fmri AND language'
+FIELD_QUERY = '"functional neuroimaging"[mesh] AND music[mesh]'
 
 
 # +
@@ -93,32 +94,29 @@ def make_2color_cmap(color1, color2):
     '''
     Make a colormap that's a gradient between 2 colors
     '''
-    rbg1 = colors.to_rgb(color1)
-    rbg2 = colors.to_rgb(color2)
+    rgb1 = colors.to_rgb(color1)
+    rgb2 = colors.to_rgb(color2)
     N=256
     vals = np.ones((N, 4))
     for comp in range(3):
-        vals[:, comp] = np.linspace(rbg1[comp], rbg2[comp], N)
+        vals[:, comp] = np.linspace(rgb1[comp], rgb2[comp], N)
     cmap = ListedColormap(vals)
     return(cmap)
 
-# constant end of the colormap gradients
-constant_colour = 'black'
+def make_cmps(constant_colour, none_colour, other_colours):
+    
+    cmaps = []
+    rgbs_list = []
+    for c in other_colours[0:len(METHODS_QUERIES)]:
+        cmaps.append(make_2color_cmap(c, constant_colour))
+        rgbs_list.append(colors.to_rgb(c))
+    rgbs_list.append(colors.to_rgb(none_colour))
 
-# colors to loop through for the other end of each gradient
-color_names = ['green',
-               'dodgerblue',
-               'orange',
-               'red'
-]
+    constant_cmap = make_2color_cmap(none_colour, constant_colour)
+    return constant_cmap, cmaps, rgbs_list
 
-cmaps = []
-rbgs_list = []
-for c in color_names[0:len(METHODS_QUERIES)]:
-    cmaps.append(make_2color_cmap(c, constant_colour))
-    rbgs_list.append(colors.to_rgb(c))
-        
-constant_colour_cmap = make_2color_cmap(constant_colour, constant_colour)
+
+
 # -
 
 # Load data
@@ -161,72 +159,114 @@ print('Number of PMCIDs: ', len(all_ids))
 
 coords = circum_points(id_list=all_ids, radius=10)
 
+
 # +
-plt.style.use('dark_background')
+def plot_methnet(data, coords, save_fig=True):
+   
+    
+    # plot ring of invisible dots (doesn't work if we dont; not sure why)
+    plt.scatter(x=coords['x'], y=coords['y'], s=1, color=constant_colour, alpha=0)   
+
+    n_none_found = 0
+    for id_orig in data.index:
+
+        # determine colormap based on software used
+        none_found = True
+        cmap = constant_cmap
+        for n, method in enumerate(METHODS_QUERIES):
+            if data.loc[id_orig, method] > 0:
+                cmap = cmaps[n]
+                color = rgbs_list[n]
+                none_found = False
+        if not none_found:
+            # make bigger coloured dot for article in search results 
+            dot_color = np.expand_dims(np.array(color), axis=0)
+            plt.scatter(x1, y1, s=10, c=dot_color, alpha=alpha)
+        else:
+            n_none_found = n_none_found + 1
+
+
+        # plot each reference as a line
+        for id_ref in data.loc[id_orig, 'refs']:
+
+            # location of citing paper
+            x1, y1 = coords.loc[id_orig, 'x'], coords.loc[id_orig, 'y']
+
+            # location of cited paper
+            x2, y2 = coords.loc[id_ref, 'x'], coords.loc[id_ref, 'y']
+
+            # create a list of coordinates for points on a line between the 2 paper-points
+            x = np.linspace(x1, x2, num=10)
+            y = np.linspace(y1, y2, num=10)
+
+
+            # make line between them
+            colorline(x, y, cmap=cmap, linewidth=1, alpha=alpha) 
+            plt.axis('off')
+    
+    # create legend
+    custom_lines = []
+    for n, method in enumerate(METHODS_QUERIES + ['Other']):
+        #mpatches.Patch(color='red', label='The red data'
+        info = Line2D([0], [0], color=rgbs_list[n], 
+                      lw=2, label=method)
+        custom_lines.append(info)
+    legend = plt.legend(handles = custom_lines, fontsize='x-large', loc='upper right', 
+               frameon=False, title='Method keywords')
+    plt.setp(legend.get_title(),fontsize='x-large')
+    plt.tight_layout()
+    
+    if save_fig:
+        plt.savefig('../images/visualization.png')
+
+        
+def gif_of_methnet_per_year(data, coords):
+    years = np.unique(list(data['year']))
+    years = years
+    n_year = 0
+    png_names = []
+    all_years = range(np.min(years), np.max(years))
+    for n_year, year in enumerate(all_years):
+        if n_year == 0:
+            d = data.loc[data['year'] == year]
+        else:
+            d = data.loc[data['year'] <= year]
+
+        fig, ax = plt.subplots(figsize=(10, 10))
+        plot_methnet(d, coords, save_fig=False)
+        
+        #before = '- - - ' * n_year
+        #after = ' - - -' * (len(years) - n_year + 1)
+        #timeline = '|- ' + before + str(year) + after + ' -|'
+        
+        title = (f'Search terms: {FIELD_QUERY}'
+                 f'\n\n{year}')
+        plt.title(title, fontsize='xx-large', loc='center')
+        plt.tight_layout()
+        
+        png_name = f'../images/images_for_gif/{year}.png'
+        plt.savefig(png_name)
+        png_names.append(png_name)
+        
+    gif_name = '../images/visualization.gif'
+
+    images = []
+    for png_name in png_names:
+        images.append(imageio.imread(png_name))
+    imageio.mimsave(gif_name, images, duration = .5)
+
+
+
 alpha = .2
-fig, ax = plt.subplots(figsize=(10, 10))
-plt.scatter(x=coords['x'], y=coords['y'], s=1, color=constant_colour)
-n = 0
-n_none_found = 0
-for id_orig in data.index:
-    n = n + 1
-    print(f'Plotting ID {n} / {len(data)}', end='\r')
-    
-    # determine colormap based on software used
-    none_found = True
-    for n, method in enumerate(METHODS_QUERIES):
-        if data.loc[id_orig, method] > 0:
-            cmap = cmaps[n]
-            color = rbgs_list[n]
-            none_found = False
+constant_colour = 'black'
+none_colour = 'darkgrey'
+other_colours=['green', 'dodgerblue', 'orange', 'red']
+constant_cmap, cmaps, rgbs_list = make_cmps(constant_colour, none_colour, other_colours)
 
-    # if at least one software was found, colour the line
-    if not none_found:                    
-        # make bigger coloured dot for article in search results 
-        dot_color = np.expand_dims(np.array(color), axis=0)
-        plt.scatter(x1, y1, s=100, c=constant_colour, alpha=.5)
-    else:
-        n_none_found = n_none_found + 1
-        cmap = constant_colour_cmap
-    
-    # plot each reference as a line
-    for id_ref in data.loc[id_orig, 'refs']:
-        
-        # location of citing paper
-        x1, y1 = coords.loc[id_orig, 'x'], coords.loc[id_orig, 'y']
-
-        # location of cited paper
-        x2, y2 = coords.loc[id_ref, 'x'], coords.loc[id_ref, 'y']
-
-        # create a list of coordinates for points on a line between the 2 paper-points
-        x = np.linspace(x1, x2, num=10)
-        y = np.linspace(y1, y2, num=10)
-
-        
-        # make line between them
-        colorline(x, y, cmap=cmap, linewidth=1, alpha=alpha) 
-        plt.axis('off')
-
-print(f'\n{n_none_found} out of {len(data)} had none of the keywords found')
-            
-# create legend
-custom_lines = []
-for n, method in enumerate(METHODS_QUERIES):
-    #mpatches.Patch(color='red', label='The red data'
-    info = Line2D([0], [0], marker='o', color=rbgs_list[n], 
-                  lw=2, label=method, alpha=1)
-    custom_lines.append(info)
-plt.legend(handles = custom_lines, fontsize='x-large', loc='upper right', frameon=False)
-
-
-title = (f'Citation network for papers matching the query \"{FIELD_QUERY}\",\n'
-         f'with papers in the search results coloured by the software mentioned')
-
-plt.suptitle(title, fontsize=20)
-plt.savefig('../images/results_visualization.png')
-
-# -
-
-
+if constant_colour == 'black':
+    plt.style.use('dark_background')
+else:
+    plt.style.use('seaborn-white')
+gif_of_methnet_per_year(data, coords)
 
 

@@ -1,8 +1,12 @@
-# data
-*.json
+# ignore yearly png's used to make gif
+images/images_for_gif/
 
-# rough notes
+# jupyter notebooks
+*.ipynb
+
+# rough notes and work
 sandbox.md
+methnet/sandbox/
 
 # my pubmed api key
 pubmed_api_key.txt
