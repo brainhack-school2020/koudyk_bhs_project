@@ -251,26 +251,3 @@ except Exception as err:
 
 # save all the data
 data.to_csv('../data/pubmed_data.csv')
-
-# # make matrix of references
-# print('\nConverting citation data to a matrix. This may take a while')
-#
-# # list all unique pmids
-# ids = data.index.to_list()
-# for row in data['refs']:
-#     ids = ids + row
-# ids = np.unique(ids)
-#
-# # make an empty adjacency matrix
-# mat = pd.DataFrame(columns=ids, index=[i for i in ids]).fillna(0)
-# mat.index = mat.index.rename('pmid')
-#
-# # set to 1 when a pubmed ID
-# for n, pmid in enumerate(data.index):
-#     print('ID %d / %d' % (n + 1, len(data)), end='\r')
-#     for refid in data.loc[pmid]['refs']:
-#         mat.loc[pmid, refid] = 1
-# print('\n')
-#
-# # save the matrix
-# mat.to_csv('pubmed_citation_matrix.csv')
