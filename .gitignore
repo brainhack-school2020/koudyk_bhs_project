@@ -1,4 +1,8 @@
-# ignore yearly png's used to make gif
+# data and visualizations
+images/visualization*
+data/pubmed_data*
+
+# yearly png's used to make gif
 images/images_for_gif/
 
 # error files
