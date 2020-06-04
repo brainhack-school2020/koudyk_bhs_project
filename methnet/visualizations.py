@@ -11,7 +11,7 @@ from matplotlib.lines import Line2D
 import math
 import imageio
 
-alpha = .2
+alpha = .3
 
 # +
 def make_segments(x, y):
@@ -230,10 +230,10 @@ def gif_of_methnet(data, field_query, list_methods_queries, data_id, gif_id,
         png_names.append(png_name)
 
     # make gif
-    print('\n\nMaking GIF')
+    print('\n\nMaking GIF...')
     gif_name = f'../images/visualization__{gif_id}.gif'
     images = []
-    repeat_last = 5
+    repeat_last = 10
     for n, png_name in enumerate(png_names):
         image = imageio.imread(png_name)
         images.append(image)
@@ -244,4 +244,19 @@ def gif_of_methnet(data, field_query, list_methods_queries, data_id, gif_id,
                 images.append(image)
     imageio.mimsave(gif_name, images, duration=.5)
     print(f'GIF saved to\n{gif_name}')
+    plt.close()
     return gif_name
+
+# field_query = '"functional neuroimaging"[mesh] AND music[mesh]'
+# list_methods_queries = ['spm', 'afni', 'nilearn', 'fsl']
+# list_method_colors = ['green', 'dodgerblue', 'orange', 'red']
+# data_id = "example"
+# gif_id = "example"
+#
+# datafile = f'../data/pubmed_data__{data_id}.csv'
+# data = pd.read_csv(datafile, converters={'refs': eval})
+# data = data.set_index('pmcid', drop=True)
+#
+# gif_of_methnet(data, field_query, list_methods_queries, data_id, gif_id,
+#                list_method_colors, constant_color='black',
+#                none_color='black', sort_by_year=False, shuffle=False)
