@@ -1,6 +1,8 @@
 # data and visualizations
 images/visualization*
 data/pubmed_data*
+images/*.gv
+images/presentations/
 
 # yearly png's used to make gif
 images/images_for_gif/
@@ -16,7 +18,7 @@ sandbox.md
 methnet/sandbox/
 
 # my pubmed api key
-pubmed_api_key.txt
+ncbi_api_key.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
