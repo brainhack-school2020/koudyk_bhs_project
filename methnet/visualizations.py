@@ -9,7 +9,6 @@ from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 import math
 import imageio
-import IPython
 
 alpha = .15
 

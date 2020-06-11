@@ -9,7 +9,6 @@ import pandas as pd
 import numpy as np
 import re
 import os
-import IPython
 
 print_urls = False  # I set this to true when debugging
 
