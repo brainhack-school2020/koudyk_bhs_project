@@ -9,12 +9,13 @@ import pandas as pd
 import numpy as np
 import re
 import os
+import IPython
 
 print_urls = False  # I set this to true when debugging
 
 # constants for URLs
 EMAIL = 'kendra.oudyk@mail.mcgill.ca'
-API_KEY_FILE = 'pubmed_api_key.txt'
+API_KEY_FILE = 'ncbi_api_key.txt'
 BASE_URL = ('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/')
 TOOL = 'methnet'
 ESEARCH_DB = 'pubmed'
@@ -39,23 +40,23 @@ def build_esearch_url(field_query):
     url = (f'{BASE_URL}esearch.fcgi?&db={ESEARCH_DB}&retmax={MAX_N_RESULTS}'
            f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}&usehistory=y'
            f'&term={field_query}+AND+pubmed+pmc+open+access[filter]')
-    url = (url.replace('"', '%22').replace(' ', '+').replace('()', '').
-           replace(')', ''))
+    url = url.replace(' ', '+')
+    url = url.replace('"', '%22').replace('(', '%28').replace(')', '%28')
     if print_urls:
-        print('ESEARCH URL', esearch_url, '\n')
+        print('ESEARCH URL', url, '\n')
     return(url)
 
 
 def build_efetch_url_from_history(pmcid, esearch_tree):
     query_key = esearch_tree.find('QueryKey').text
     web_env = esearch_tree.find('WebEnv').text
-    efetch_url = (f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
-                  f'efetch.fcgi?db=pmc&id={pmcid}'
-                  f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
-                  f'&WebEnv={web_env}&query_key={query_key}')
+    url = (f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/'
+           f'efetch.fcgi?db=pmc&id={pmcid}'
+           f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
+           f'&WebEnv={web_env}&query_key={query_key}')
     if print_urls:
-        print('EFETCH URL', efetch_url, '\n')
-    return efetch_url
+        print('EFETCH URL', url, '\n')
+    return url
 
 
 def build_elink_url(id):
@@ -66,7 +67,7 @@ def build_elink_url(id):
            f'&api_key={API_KEY}&email={EMAIL}&tool={TOOL}'
            f'&linkname={ELINK_LINKNAME}&id={id}')
     if print_urls:
-        print('ELINK URL', elink_url, '\n')
+        print('ELINK URL', url, '\n')
     return url
 
 
@@ -96,6 +97,7 @@ def divide_list_into_chunks(my_list, chunk_len):
 
 def pmids_to_pmcids(pmid_list):
     urls = []
+    all_pmcids = []
     # break list of ids into chunks of 200, since that is the limit for the api
     ids_in_chunks = list(divide_list_into_chunks(pmid_list, 200))
     for chunk in ids_in_chunks:
@@ -109,9 +111,10 @@ def pmids_to_pmcids(pmid_list):
         tree = etree.XML(response.content)
         full_pmcids = tree.xpath("//record/@pmcid")
         pmcids = [int(re.match(r"PMC(\d+)", pmcid).group(1)) for pmcid in full_pmcids]
+        all_pmcids = all_pmcids + pmcids
 
         space_searches(n_searches=len(ids_in_chunks))
-    return pmcids, urls
+    return all_pmcids, urls
 
 
 def get_method_data(pmcids, esearch_tree):
@@ -144,7 +147,11 @@ def get_first_instance(tree, term):
     items = []
     for el in tree.iter(term):
         items.append(el.text)
-    return items[0]
+    if len(items) > 0:
+        item = items[0]
+    else:
+        item = []
+    return item
 
 
 def make_data(field_query, list_methods_queries, data_id='noname',
@@ -155,7 +162,7 @@ def make_data(field_query, list_methods_queries, data_id='noname',
     # make pandas dataframe to store results
     columns = (['pmcid', 'pmid', 'month', 'year', 'title', 'journal', 'refs'] +
                list_methods_queries +
-               ['esearch_url', 'efetch_url', 'elink_url'])
+               ['esearch_url', 'efetch_url', 'elink_url', 'pm_pmc_cnvrt_urls'])
     data = pd.DataFrame(columns=columns)
     data = data.set_index('pmcid', drop=True)
 
@@ -174,18 +181,21 @@ def make_data(field_query, list_methods_queries, data_id='noname',
             print(f'Warning: More than the max. number of results allowed per'
                   ' page; only the first {MAX_N_RESULTS} will be considered')
         if int(esearch_tree.find('Count').text) > 0:  # if there are results
-            edata_ids = get_ids(esearch_tree)
+            esearch_pmids = get_ids(esearch_tree)
         else:
-            edata_ids = []
+            esearch_pmids = []
             print('No search results:\'(')
 
-        print(f'\n{len(edata_ids)} articles found\n')
+        print(f'\n{len(esearch_pmids)} articles found\n')
 
         # convert the pubmed ids from the search results to pmc ids, so that we
         # can access the full text with efetch
-        pmcids, cnvrt_urls = pmids_to_pmcids(edata_ids)
+        print('Converting PMIDs to PMCIDs\n')
+        pmcids, cnvrt_urls = pmids_to_pmcids(esearch_pmids)
+        print(f'{len(pmcids)} PMCIDs\n')
 
         # add new row in the data dataframe, one for each ID found
+        print('Adding rows to dataframe\n')
         data_method = pd.DataFrame(columns=columns)
         data_method['pmcid'] = pmcids
         data_method = data_method.set_index('pmcid', drop=True)
@@ -241,7 +251,8 @@ def make_data(field_query, list_methods_queries, data_id='noname',
         print(err)
         with open(f'../data/response_dumped_by_error__{data_id}.json', 'w') as json_file:
             json.dump(response.text, json_file)
-        os.remove(datafile)
+        if os.path.exists(datafile):
+            os.remove(datafile)
 
     # save all the data
     data.to_csv(datafile)
