@@ -33,7 +33,8 @@ def get_methnet(field_query,
             list_method_colors,
             constant_color='black',
             none_color='black',
-            sort_by_year=True):
+            sort_by_year=True,
+            figure_title=' '):
     '''
 
     '''
@@ -56,5 +57,6 @@ def get_methnet(field_query,
                                     list_method_colors=list_method_colors,
                                     constant_color=constant_color,
                                     none_color=constant_color,
-                                    sort_by_year=sort_by_year)
+                                    sort_by_year=sort_by_year,
+                                    figure_title=figure_title)
     return gif_path, png_path, data
