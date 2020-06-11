@@ -1,0 +1,36 @@
+// Visualization
+digraph {
+	pubmed [label="All data"]
+	ydata [label="Select data
+up until given year"]
+	ring [label="Make x-y coordinates for a circle
+with a point for each ID"]
+	line [label="For each search result,
+draw lines between the SR-ID and its ref-IDs,
+colored by the method mentioned" color=white]
+	cmaps [label="Make a colormap
+ for each methods
+keyword"]
+	pickc [label="For each search result,
+Choose a colormap
+ based on method mentioned" color=white]
+	fig [label="Save image for given year"]
+	gif [label="Make gif out of yearly images"]
+	pubmed -> ydata
+	pubmed -> ring [label="IDs of
+search results"]
+	pubmed -> ring [label="IDs of
+references"]
+	cmaps -> pickc [label="List of
+colormaps"]
+	ring -> line [label=Coordinates]
+	subgraph cluster_1 {
+		color=lightgrey style=filled
+		label="For each year" labeljust=l
+		ydata -> pickc [label="Counts of
+methods keywords"]
+		pickc -> line [label=Colormap color=white]
+		line -> fig
+	}
+	fig -> gif
+}

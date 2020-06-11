@@ -1,0 +1,75 @@
+// Pipeline
+digraph {
+	input [label="User input"]
+	esearch [label="Esearch e-utility
+to look for search results"]
+	idconv [label="Idconv
+to convert IDs to allow searches
+in PubMed and PubMed Central"]
+	efetch [label="Efetch e-utility"]
+	search [label="xpath
+to search for info"]
+	count [label="str.count()
+to count mentions of keywords"]
+	elink [label="Elink e-utility
+to get references
+for each PMID"]
+	store [label="Pandas dataframe
+ to store data for given PMCID"]
+	input -> esearch [label=" PubMed
+query"]
+	esearch -> idconv [label=" PMIDs"]
+	idconv -> efetch [label=" PMCID"]
+	input -> count [label=" methods
+ keywords"]
+	idconv -> elink [label=PMCID]
+	subgraph cluster_0 {
+		color=lightgrey style=filled
+		efetch -> search [label="article
+in XML"]
+		search -> store [label="title, journal,
+date, PMID"]
+		efetch -> count [label="article
+ in XML"]
+		count -> store [label=" counts of
+method
+ keywords"]
+		elink -> store [label="PMIDs
+of refs"]
+		label="For each PMCID" labeljust=l
+	}
+	store -> pubmed
+	pubmed [label="All data"]
+	ydata [label="Select data
+up until given year"]
+	ring [label="Make x-y coordinates for a circle
+with a point for each ID"]
+	line [label="For each search result,
+draw lines between the SR-ID and its ref-IDs,
+colored by the method mentioned" color=white]
+	cmaps [label="Make a colormap
+ for each methods
+keyword"]
+	pickc [label="For each search result,
+Choose a colormap
+ based on method mentioned" color=white]
+	fig [label="Save image for given year"]
+	gif [label="Make gif out of yearly images"]
+	pubmed -> ydata
+	pubmed -> ring [label="IDs of
+search results"]
+	pubmed -> ring [label="IDs of
+references"]
+	cmaps -> pickc [label="List of
+colormaps"]
+	ring -> line [label=Coordinates]
+	subgraph cluster_1 {
+		color=lightgrey style=filled
+		label="For each year" labeljust=l
+		ydata -> pickc [label="Counts of
+methods keywords"]
+		pickc -> line [label=Colormap color=white]
+		line -> fig
+	}
+	fig -> gif
+}
