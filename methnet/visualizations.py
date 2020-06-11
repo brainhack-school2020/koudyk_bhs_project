@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,8 +9,9 @@ from matplotlib.collections import LineCollection
 from matplotlib.lines import Line2D
 import math
 import imageio
+import IPython
 
-alpha = .3
+alpha = .15
 
 # +
 def make_segments(x, y):
@@ -130,12 +130,6 @@ def plot_methnet(data, coords, field_query, list_methods_queries, data_id,
                 cmap = cmaps[n]
                 color = rgbs_list[n]
                 none_found = False
-        if not none_found:
-            # make bigger colored dot for article in search results
-            dot_color = np.expand_dims(np.array(color), axis=0)
-            plt.scatter(x1, y1, s=10, c=dot_color, alpha=alpha)
-        else:
-            n_none_found = n_none_found + 1
 
         # plot each reference as a line
         for id_ref in data.loc[id_orig, 'refs']:
@@ -155,9 +149,16 @@ def plot_methnet(data, coords, field_query, list_methods_queries, data_id,
             colorline(x, y, cmap=cmap, linewidth=1, alpha=alpha)
             plt.axis('off')
 
+        if not none_found:
+            # make bigger colored dot for article in search results
+            dot_color = np.expand_dims(np.array(color), axis=0)
+            plt.scatter(x1, y1, s=10, c=dot_color, alpha=alpha)
+        else:
+            n_none_found = n_none_found + 1
+
     # create legend
     custom_lines = []
-    for n, method in enumerate(list_methods_queries + ['Other']):
+    for n, method in enumerate(list_methods_queries):  # + ['Other']):
         info = Line2D([0], [0], color=rgbs_list[n],
                       lw=2, label=method)
         custom_lines.append(info)
@@ -172,7 +173,8 @@ def plot_methnet(data, coords, field_query, list_methods_queries, data_id,
 
 def gif_of_methnet(data, field_query, list_methods_queries, data_id, gif_id,
                    list_method_colors, constant_color,
-                   none_color, sort_by_year=False, shuffle=False):
+                   none_color, sort_by_year=False, shuffle=False,
+                   figure_title=' '):
     '''
     '''
     # List all unique pmcids
@@ -220,12 +222,12 @@ def gif_of_methnet(data, field_query, list_methods_queries, data_id, gif_id,
                      constant_color=constant_color,
                      none_color=none_color)
 
-        title = (f'Search terms: {field_query}\n\n{year}')
+        title = (f'Citation network for\n{figure_title}\n\n{year}')
         plt.title(title, fontsize='xx-large', loc='center')
         plt.tight_layout()
 
         # save series of png files to be made into gif
-        png_name = f'../images/images_for_gif/{year}__{gif_id}.png'
+        png_name = f'../images/images_for_gif/{gif_id}__{year}.png'
         plt.savefig(png_name)
         png_names.append(png_name)
 
