@@ -6,8 +6,6 @@ images/visualization*
 data/pubmed_data*
 images/*.gv
 images/presentations/
-
-# yearly png's used to make gif
 images/images_for_gif/
 
 # error files
