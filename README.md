@@ -7,7 +7,7 @@ By Kendra Oudyk (she/her)
 ![](images/visualization__example.gif)
 
 ## Summary
-For this project, I worked on Python package that creates a citation network for a given field that evolves over time, colored by methods used by papers in that field.
+A Python package that create a dynamic visualization the use of methods in citation networks over time.
 
 ## Project definition
 
@@ -34,7 +34,7 @@ I was able to create the type of figure that I had envisioned, and I practiced u
 In this project, I practiced (more or less)
 - [x] Packaging
 - [x] GitHub issues & projects
-- [x] API interaction
+- [x] API interaction, specifically, using the [NCBI Entrez Programming E-utilities](https://www.ncbi.nlm.nih.gov/books/NBK25497/)
 - [x] XML
 - [x] Jupytext
 - [x] Python
@@ -52,4 +52,4 @@ Although the project did not end up exactly where I'd hoped, I learned a lot alo
 - Glatard, T., Lewis, L. B., Ferreira da Silva, R., Adalat, R., Beck, N., Lepage, C., ... & Khalili-Mahani, N. (2015). Reproducibility of neuroimaging analyses across operating systems. *Frontiers in Neuroinformatics, 9*, 12.
 
 #### \*NCBI's Disclaimer and Copyright notice
-The National Center for Biotechnology Information (NCBI), who own the PubMed data and E-utilities that we will be using, requests that we make this [Disclaimer and Copyright notice](https://www.ncbi.nlm.nih.gov/home/about/policies/) evident to users.
+The National Center for Biotechnology Information (NCBI), who own the data and E-utilities that this package uses, requests that we make this [Disclaimer and Copyright notice](https://www.ncbi.nlm.nih.gov/home/about/policies/) evident to users.
