@@ -11,3 +11,4 @@ matplotlib
 math
 imageio
 setuptools
+IPython
