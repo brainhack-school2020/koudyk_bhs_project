@@ -7,12 +7,12 @@ By Kendra Oudyk (she/her)
 ![](images/visualization__example.gif)
 
 ## Summary
-A Python package that create a dynamic visualization the use of methods in citation networks over time.
+A Python package that creates a dynamic visualization the use of methods in citation networks over time.
 
 ## Project definition
 
 ### Background
-Methods can influence results in fMRI research (e.g., Carp, 2012; Eklund et al., 2016; Glatard et al., 2015). If methods influence results, then methodological trends may stystematically influence results. In order to explore this problem space, I thought it might be helpful to visualize methodological trends in fMRI research.
+Methods can influence results in fMRI research (e.g., Carp, 2012; Eklund et al., 2016; Glatard et al., 2015). If methods influence results, then methodological trends may systematically influence results. In order to explore this problem space, I thought it might be helpful to visualize methodological trends in fMRI research.
 
 ### Purpose
 The purpose of this project was to make a Python package that could create a citation network for a given field, colored by methods used by papers in that field. Such a figure would be created for each year in a range, so that one can see the development of the network and the use of methods over time. Using this package to look at research using fMRI, I hope to observe whether methods correspond to groupings of papers in the citation network.
@@ -41,7 +41,7 @@ In this project, I practiced (more or less)
 - [x] Data visualization
 
 ## Conclusion and acknowledgement
-Although the project did not end up exactly where I'd hoped, I learned a lot along the way. I appreciate all the effort that was put in by the BHS instructors and organizers, particularly Sam, Agah, Alexa, and Loic. I'm also especially thankful to Jérôme, who helped me even though he wasn't part of the BHS.
+Although the project did not end up exactly where I'd hoped, I learned a lot along the way. I appreciate all the effort that was put in by the BHS instructors and organizers, particularly Sam, Agah, Alexa, and Loïc. I'm also especially thankful to Jérôme, who helped me even though he wasn't part of the BHS.
 
 
 ***
