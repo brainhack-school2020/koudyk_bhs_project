@@ -10,7 +10,7 @@ from matplotlib.lines import Line2D
 import math
 import imageio
 
-alpha = .15
+alpha = .4
 
 # +
 def make_segments(x, y):
